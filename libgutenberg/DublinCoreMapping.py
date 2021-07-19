@@ -28,7 +28,7 @@ from . import GutenbergDatabase
 from .GutenbergGlobals import Struct, PG_URL
 from .Logger import info, warning, error
 from .GutenbergDatabase import DatabaseError, IntegrityError, Objectbase
-from .Models import Attribute, Book, Encoding, File, Filetype
+from .Models import Attribute, Book, File, Filetype
 
 
 class DublinCoreObject(DublinCore.GutenbergDublinCore):
@@ -99,7 +99,7 @@ class DublinCoreObject(DublinCore.GutenbergDublinCore):
                 self.title_file_as = marc.text[attrib.nonfiling:]
                 self.title_file_as = self.title_file_as[0].upper() +\
                     self.title_file_as[1:]
-                info("Title: %s" % self.title)
+                info("Title: %s", self.title)
 
         # languages (datatype)
 
@@ -143,7 +143,7 @@ class DublinCoreObject(DublinCore.GutenbergDublinCore):
         session = self.get_my_session()
 
         # files(not strictly DublinCore but useful)
-        if self.book: 
+        if self.book:
             self.files = self.book.files
         else:
             #only files wanted
@@ -203,11 +203,13 @@ class DublinCoreObject(DublinCore.GutenbergDublinCore):
 
             # check good filetype
             if not session.query(Filetype).filter(Filetype.pk == type_).count():
+                warning("%s is not a valid filetype, didn't store %s", type_, filename)
                 return
 
-            filename = re.sub('^.*/cache/', 'cache/', filename)
+            # this introduces a restriction on CACHELOC; should consider deriving the pattern
+            filename = re.sub(r'^.*/cache\d?/', 'cache/', filename)
             diskstatus = 0
-            session.begin_nested()
+
             # delete existing filename record
             session.query(File).filter(File.archive_path == filename).\
                                 delete(synchronize_session='fetch')
@@ -222,10 +224,10 @@ class DublinCoreObject(DublinCore.GutenbergDublinCore):
             session.commit()
 
         except OSError:
-            error("Cannot stat %s" % filename)
+            error("Cannot stat %s", filename)
 
         except IntegrityError:
-            error("Book number %s is not in database." % id_)
+            error("Book number %s is not in database.", id_)
             self.session.rollback()
 
 
@@ -242,5 +244,5 @@ class DublinCoreObject(DublinCore.GutenbergDublinCore):
             session.rollback()
 
         except (DatabaseError, DBAPIError) as what:
-            warning("Error updating coverpage in database: %s." % what)
+            warning("Error updating coverpage in database: %s.", what)
             session.rollback()

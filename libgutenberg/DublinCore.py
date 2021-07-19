@@ -361,12 +361,12 @@ class DublinCore (object):
         lit = writer.literal
         # uri = writer.uri
 
-        lit ('dcterms:title',      self.title)
-        lit ('dcterms:source',     self.source)
+        lit ('dc:title',      self.title)
 
         for language in self.languages:
-            lit ('dcterms:language', language.id, 'dcterms:RFC4646')
+            lit ('dc:language', language.id, 'dcterms:RFC4646')
 
+        lit ('dcterms:source',     self.source)
         lit ('dcterms:modified',
              datetime.datetime.now (gg.UTC ()).isoformat (),
              'dcterms:W3CDTF')
@@ -381,9 +381,6 @@ class DublinCore (object):
         e = ElementMaker ()
 
         head = e.head (
-            e.link (rel = "schema.DCTERMS", href = str (NS.dcterms)),
-            e.link (rel = "schema.MARCREL", href = str (NS.marcrel)),
-            profile = "http://dublincore.org/documents/2008/08/04/dc-html/",
             *w.metadata
             )
 
@@ -504,9 +501,21 @@ class GutenbergDublinCore (DublinCore):
 
     def __init__ (self):
         DublinCore.__init__ (self)
-        self.project_gutenberg_id = None
         self.project_gutenberg_title = None
         self.is_format_of = None
+        self._project_gutenberg_id = None
+
+
+    @property
+    def project_gutenberg_id(self):
+        return self._project_gutenberg_id
+
+    @project_gutenberg_id.setter
+    def project_gutenberg_id(self, ebook):
+        self._project_gutenberg_id = int (ebook)
+        self.is_format_of = str (NS.ebook) + str (ebook)
+        self.canonical_url = re.sub(r'^http:', 'https:', self.is_format_of) + '/'
+
 
 
     def feed_to_writer(self, writer):
@@ -517,18 +526,18 @@ class GutenbergDublinCore (DublinCore):
         lit = writer.literal
         uri = writer.uri
 
-        lit('dcterms:publisher',  self.publisher)
-        lit('dcterms:rights',     self.rights)
+        lit('dc:publisher',  self.publisher)
+        lit('dc:rights',     self.rights)
         uri('dcterms:isFormatOf', self.is_format_of)
 
         for author in self.authors:
             if author.marcrel == 'aut' or author.marcrel == 'cre':
-                lit('dcterms:creator', author.name_and_dates)
+                lit('dc:creator', author.name_and_dates)
             else:
                 lit('marcrel:' + author.marcrel, author.name_and_dates)
 
         for subject in self.subjects:
-            lit('dcterms:subject', subject.subject, 'dcterms:LCSH')
+            lit('dc:subject', subject.subject, 'dcterms:LCSH')
 
         if self.release_date:
             lit('dcterms:created', self.release_date.isoformat(),
@@ -579,7 +588,7 @@ class GutenbergDublinCore (DublinCore):
                             self.project_gutenberg_id = int(contents)
                             self.is_format_of = str(NS.ebook) + str(self.project_gutenberg_id)
                         except ValueError:
-                            error('Invalid ebook no. in RST meta: %s' % contents)
+                            error('Invalid ebook no. in RST meta: %s', contents)
                             return False
                     elif name == 'title':
                         self.project_gutenberg_title = contents
@@ -588,7 +597,7 @@ class GutenbergDublinCore (DublinCore):
                             self.release_date = datetime.datetime.strptime(
                                 contents, '%Y-%m-%d').date()
                         except ValueError:
-                            error('Invalid date in RST meta: %s' % contents)
+                            error('Invalid date in RST meta: %s', contents)
                     elif name == 'rights':
                         if contents.lower() == 'copyrighted':
                             self.rights = 'Copyrighted.'
@@ -602,7 +611,7 @@ class GutenbergDublinCore (DublinCore):
                         try:
                             self.add_lang_id(contents)
                         except KeyError:
-                            error('Invalid language id RST meta: %s' % contents)
+                            error('Invalid language id RST meta: %s', contents)
                     elif name == 'created':
                         pass # published date
 
@@ -676,7 +685,7 @@ class GutenbergDublinCore (DublinCore):
                         pass
 
                 if not self.release_date:
-                    error ("Cannot understand date: %s" % date)
+                    error ("Cannot understand date: %s", date)
 
 
         def handle_ebook_no (self, text):
@@ -685,7 +694,6 @@ class GutenbergDublinCore (DublinCore):
             m = re.search (r'#(\d+)\]', text)
             if m:
                 self.project_gutenberg_id = int (m.group (1))
-                self.is_format_of = str (NS.ebook) + str (self.project_gutenberg_id)
 
 
         def handle_languages (self, dummy_prefix, text):
